@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import inspect
 import streamlit as st
+# from functools import lru_cache
 
 """
 Compat layer para sizing em APIs Streamlit:
@@ -39,13 +40,26 @@ if _MODE not in ("width", "use_container_width"):
     _MODE = _detect_width_mode()
     os.environ[_ENV_KEY] = _MODE  # cache no processo
 
+def _supports(func, param_name: str) -> bool:
+    try:
+        # return param_name in inspect.signature(func).parameters
+        return _MODE
+    except Exception:
+        return False
+
+# @lru_cache(maxsize=16)
 def kw_for(func):
     """
-    Retorna kwargs compatíveis com a função Streamlit informada,
-    baseados no modo detectado/forçado em tempo de inicialização.
+    Decide *por função* quais kwargs usar:
+    - se a função aceitar `width`, usa width='stretch'
+    - senão, se aceitar `use_container_width`, usa use_container_width=True
+    - senão, {}
+    A decisão fica cacheada por função.
     """
+    # if _supports(func, "width"):
     if _MODE == "width":
         return {"width": "stretch"}
+    # if _supports(func, "use_container_width"):
     if _MODE == "use_container_width":
         return {"use_container_width": True}
     return {}

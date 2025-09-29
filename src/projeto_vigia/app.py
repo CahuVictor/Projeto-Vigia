@@ -9,7 +9,7 @@ from projeto_vigia.analytics.filters import (
     filter_by_date_range, filter_by_turno, filter_by_biomes, filter_numeric_columns
 )
 from projeto_vigia.analytics.aggregations import (
-    by_day, by_biome, top_municipios, series_by_dimension, compute_critical_regions
+    by_day, by_biome, top_municipios_with_bioma, series_by_dimension, compute_critical_regions
 )
 from projeto_vigia.ui.sidebar import render_sidebar
 from projeto_vigia.ui.sections import (
@@ -17,6 +17,12 @@ from projeto_vigia.ui.sections import (
     render_prevention_tab, render_stats_tab
 )
 from projeto_vigia.ui.compat import kw_for
+from projeto_vigia.core.logging_config import configure_logging, get_logger
+
+# Logging
+configure_logging()
+log = get_logger(app="ProjetoVigia", module="app")
+log.info("startup", page="main")
 
 setup_page()
 inject_css()
@@ -26,8 +32,12 @@ st.markdown("Este painel realiza uma análise interativa de focos de queimadas c
 
 @st.cache_data(ttl=86400, show_spinner="Baixando e processando dados CSV...")
 def load_dataset(url: str) -> pd.DataFrame:
+    log.info("dataset_download_start", url=url)
     df = read_csv_from_gdrive(url)
-    return normalize_dataframe(df)
+    log.info("dataset_download_ok", rows=len(df))
+    df2 = normalize_dataframe(df)
+    log.info("dataset_normalized", rows=len(df2), cols=list(df2.columns))
+    return df2
 
 try:
     df_full = load_dataset(FILE_URL)
@@ -60,10 +70,20 @@ elif sidebar_state and sidebar_state["buscar"]:
     dff = filter_by_turno(dff, preset=turno_preset, custom_range=custom_time)
     # Filtros numéricos (dias sem chuva, precipitação, risco, FRP)
     dff = filter_numeric_columns(dff, numeric_rules)
+    
+    log.info("filters_applied",
+         estado=estado,
+         biomas=len(biomas) if biomas else 0,
+         start=str(start_dt.date()),
+         end=str(end_dt.date()),
+         turno=turno_preset,
+         custom_time=bool(custom_time),
+         rows=len(dff))
 
     # 3) Saída
     if dff.empty:
         st.warning("Nenhum foco de queimada foi encontrado para os filtros selecionados.")
+        log.warning("no_results_after_filters")
     else:
         crit = compute_critical_regions(dff, top_n=5)  # << calcular aqui
 
@@ -86,7 +106,9 @@ elif sidebar_state and sidebar_state["buscar"]:
                 series_by_dimension(dff, "Bioma"),
             )
         with tab3:
-            render_biome_city_tab(by_biome(dff), top_municipios(dff))
+            df_bioma = by_biome(dff)
+            df_mun_bioma = top_municipios_with_bioma(dff)
+            render_biome_city_tab(df_bioma, df_mun_bioma) # old render_biome_city_tab(by_biome(dff), top_municipios(dff))
         with tab4:
             render_stats_tab(dff)
         with tab5:

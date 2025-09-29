@@ -7,9 +7,11 @@ def _risk_to_rgb(r):
     Mapeia RiscoFogo ∈ [0,1] para cor do amarelo ao vermelho:
     0 -> amarelo (255, 215, 0)
     1 -> vermelho (220, 20, 60)
+    Nulo -> cinza claro (fallback)
     """
+    if pd.isna(r):
+        return [180,180,180]
     r = max(0.0, min(1.0, float(r)))
-    # interpolação linear entre amarelo e vermelho
     yellow = (255, 215, 0)
     red = (220, 20, 60)
     return [int(yellow[i] + (red[i]-yellow[i])*r) for i in range(3)]
@@ -21,10 +23,10 @@ def simple_map(df: pd.DataFrame):
 
     dff = df[["lat","lon","RiscoFogo","FRP","estado_nome","municipio_nome","Bioma","Precipitacao","DiaSemChuva"]].copy()
     dff["color"] = dff["RiscoFogo"].apply(_risk_to_rgb)
-    # raio base (em metros). FRP ~ 60..300 -> normalize
+
     frp = dff["FRP"].clip(lower=0.0)
     frp_norm = (frp - frp.min()) / (frp.max() - frp.min() + 1e-9)
-    dff["radius"] = 300 + (frp_norm * 1700)  # 300m a 2000m
+    dff["radius"] = 300 + (frp_norm * 1700)
 
     layer = pdk.Layer(
         "ScatterplotLayer",
@@ -44,3 +46,13 @@ def simple_map(df: pd.DataFrame):
     }
     r = pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip, map_style=None)
     st.pydeck_chart(r)
+
+    # Legenda simples (amarelo -> vermelho)
+    st.markdown("""
+    <div style="padding:6px; border:1px solid #444; display:inline-block; border-radius:6px; background:#222; color:#ddd;">
+      <b>Legenda (Risco de Fogo)</b>&nbsp;&nbsp;
+      <span style="display:inline-block; width:14px; height:14px; background:rgb(255,215,0);"></span> 0 &nbsp;→&nbsp;
+      <span style="display:inline-block; width:14px; height:14px; background:rgb(220,20,60);"></span> 1
+      &nbsp;&nbsp;<small>(cor do marcador)</small>
+    </div>
+    """, unsafe_allow_html=True)

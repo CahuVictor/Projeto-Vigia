@@ -1124,6 +1124,18 @@ snowflake = ["snowflake-connector-python (>=3.3.0) ; python_version < \"3.12\"",
 sql = ["SQLAlchemy (>=2.0.0)"]
 
 [[package]]
+name = "structlog"
+version = "25.4.0"
+description = "Structured Logging for Python"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "structlog-25.4.0-py3-none-any.whl", hash = "sha256:fe809ff5c27e557d14e613f45ca441aabda051d119ee5a0102aaba6ce40eed2c"},
+    {file = "structlog-25.4.0.tar.gz", hash = "sha256:186cd1b0a8ae762e29417095664adf1d6a31702160a46dacb7796ea82f7409e4"},
+]
+
+[[package]]
 name = "tenacity"
 version = "9.1.2"
 description = "Retry code until it succeeds"
@@ -1262,4 +1274,4 @@ watchmedo = ["PyYAML (>=3.10)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11"
-content-hash = "1a7f003bb71c9289c9b755b834fc2797171603eee02ee7b545cd64d5bbb8c58e"
+content-hash = "5dce7436153fc109d37b60ba36ecd0cd13aa99ca345e2f67d42fa005f49eaf74"

@@ -12,6 +12,10 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df.rename(columns=RENAME_MAP, inplace=True)
     df["data_hora"] = pd.to_datetime(df["data_hora"], errors="coerce")
     df["DiaSemChuva"] = pd.to_numeric(df["DiaSemChuva"], errors="coerce").replace(-999, pd.NA)
-    df["RiscoFogo"] = pd.to_numeric(df["RiscoFogo"], errors="coerce")
+    df["Precipitacao"] = pd.to_numeric(df.get("Precipitacao", pd.NA), errors="coerce")
+    df["RiscoFogo"] = pd.to_numeric(df["RiscoFogo"], errors="coerce").replace(-999, pd.NA) 
+    df["FRP"] = pd.to_numeric(df["FRP"], errors="coerce")
+    
     df.dropna(subset=["lat", "lon", "data_hora", "RiscoFogo"], inplace=True)
+    # RiscoFogo pode ser NA; não descartamos aqui, só não usamos em médias/cores quando NA
     return df
