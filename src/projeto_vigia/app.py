@@ -16,6 +16,7 @@ from projeto_vigia.ui.sections import (
     render_summary_tab, render_time_tab, render_biome_city_tab,
     render_prevention_tab, render_stats_tab
 )
+from projeto_vigia.ui.compat import kw_for
 
 setup_page()
 inject_css()
@@ -39,34 +40,34 @@ sidebar_state = render_sidebar(df_full, LOGO_URL)
 if df_full.empty:
     st.warning("Os dados não puderam ser carregados. Verifique o link/permissões.")
 elif sidebar_state and sidebar_state["buscar"]:
+    # 1) Coleta de parâmetros da sidebar
     estado = sidebar_state["estado"]
     biomas = sidebar_state["biomas"]
     start_dt = sidebar_state["start"]
     end_dt = sidebar_state["end"]
     turno_preset = sidebar_state["turno_preset"]
-    custom_time = sidebar_state["custom_time"]
+    custom_time = sidebar_state["custom_time"]  # (t0, t1) ou None
     numeric_rules = sidebar_state["numeric_rules"]
 
+    # 2) Pipeline de filtros em ordem
     # Estado
     dff = df_full if estado == "Todos" else df_full[df_full["estado_nome"] == estado].copy()
     # Período
     dff = filter_by_date_range(dff, start_dt, end_dt)
     # Bioma(s)
     dff = filter_by_biomes(dff, biomas)
-    # Turno
+    # Turno / horário (preset ou faixa customizada)
     dff = filter_by_turno(dff, preset=turno_preset, custom_range=custom_time)
-    # Regras numéricas
+    # Filtros numéricos (dias sem chuva, precipitação, risco, FRP)
     dff = filter_numeric_columns(dff, numeric_rules)
 
+    # 3) Saída
     if dff.empty:
         st.warning("Nenhum foco de queimada foi encontrado para os filtros selecionados.")
     else:
-        # Regiões críticas (box na tela principal)
-        crit = compute_critical_regions(dff, top_n=5)
+        crit = compute_critical_regions(dff, top_n=5)  # << calcular aqui
 
         st.success(f"Análise concluída para **{estado}** entre **{start_dt:%d/%m/%Y}** e **{end_dt:%d/%m/%Y}**!")
-        st.subheader("Regiões Críticas (top 5)")
-        st.dataframe(crit[["estado_nome","municipio_nome","Bioma","focos","risco_medio","frp_medio","frp_max","precip_media","dias_sem_chuva_med"]])
 
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "🗺️ Mapa e Métricas",
@@ -77,7 +78,7 @@ elif sidebar_state and sidebar_state["buscar"]:
         ])
 
         with tab1:
-            render_summary_tab(dff, estado)
+            render_summary_tab(dff, estado, crit_df=crit)
         with tab2:
             render_time_tab(
                 by_day(dff),
@@ -94,6 +95,6 @@ elif sidebar_state and sidebar_state["buscar"]:
         with st.expander("Ver dados brutos (todas as colunas)"):
             df_disp = dff.rename(columns={"lat":"Latitude","lon":"Longitude","data_hora":"Data/Hora",
                                           "municipio_nome":"Município","estado_nome":"Estado"})
-            st.dataframe(df_disp)
+            st.dataframe(df_disp, **kw_for(st.dataframe))
 else:
     st.info("⬅️ Selecione os filtros na barra lateral e clique em **Analisar** para começar.")

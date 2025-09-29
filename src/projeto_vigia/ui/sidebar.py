@@ -4,7 +4,7 @@ import pandas as pd
 from PIL import Image
 import requests
 import io
-from typing import Optional, Dict, Any, Tuple
+from typing import Dict, Any
 
 def load_logo(url: str) -> Image.Image | None:
     try:
@@ -15,11 +15,21 @@ def load_logo(url: str) -> Image.Image | None:
         return None
 
 def _numeric_filter_block(label: str, key_prefix: str) -> Dict[str, Any]:
-    cols = st.columns([1.2, 1, 1])
-    op = cols[0].selectbox(f"{label} (operador)", ["(sem filtro)","=","<",">","<=" ,">=","entre"], key=f"{key_prefix}_op")
-    a = cols[1].number_input("A", value=0.0, step=0.1, key=f"{key_prefix}_a")
-    b = cols[2].number_input("B", value=0.0, step=0.1, key=f"{key_prefix}_b")
-    return {"op": op, "a": a, "b": b}
+    # Operador primeiro
+    op = st.selectbox(
+        f"{label} — operador",
+        ["(sem filtro)", "=", "<", ">", "<=", ">=", "entre"],
+        key=f"{key_prefix}_op"
+    )
+    # Inputs condicionais
+    c1, c2 = st.columns(2)
+    disabled_single = (op in ("(sem filtro)", "entre"))
+    disabled_b = (op != "entre")
+
+    a = c1.number_input("A", value=0.0, step=0.1, key=f"{key_prefix}_a", disabled=op == "(sem filtro)")
+    b = c2.number_input("B", value=0.0, step=0.1, key=f"{key_prefix}_b", disabled=disabled_b)
+
+    return {"op": op, "a": (None if op == "(sem filtro)" else a), "b": (None if disabled_b else b)}
 
 def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
     if (logo := load_logo(logo_url)):
@@ -45,7 +55,12 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
     # Date range em 1 campo
     min_date = df_full["data_hora"].min().date()
     max_date = df_full["data_hora"].max().date()
-    start_end = st.sidebar.date_input("Período (início – fim)", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    start_end = st.sidebar.date_input(
+        "Período (início – fim)",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date
+    )
     if isinstance(start_end, tuple):
         d0, d1 = start_end
     else:
@@ -55,7 +70,7 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
 
     # Turno / horário
     st.sidebar.subheader("Turno / Horário")
-    turno_preset = st.sidebar.selectbox("Turno", ["(sem filtro)","Madrugada","Manhã","Tarde","Noite"])
+    turno_preset = st.sidebar.selectbox("Turno", ["(sem filtro)", "Madrugada", "Manhã", "Tarde", "Noite"])
     custom_time = st.sidebar.checkbox("Usar faixa de horário personalizada")
     t0, t1 = None, None
     if custom_time:
@@ -63,12 +78,14 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
         t0 = c1.time_input("Início", value=pd.Timestamp("2000-01-01 08:00").time())
         t1 = c2.time_input("Fim", value=pd.Timestamp("2000-01-01 18:00").time())
 
-    # Filtros numéricos
-    st.sidebar.subheader("Filtros Numéricos")
-    rule_dias = _numeric_filter_block("Dias sem chuva", "dias_sem_chuva")
-    rule_prec = _numeric_filter_block("Precipitação (mm)", "precipitacao")
-    rule_risco = _numeric_filter_block("Risco de fogo (0–1)", "risco")
-    rule_frp = _numeric_filter_block("Intensidade (FRP)", "frp")
+    # Filtros numéricos (AGORA 100% NA SIDEBAR)
+    with st.sidebar.expander("Filtros Numéricos", expanded=True):
+        rule_dias = _numeric_filter_block("Dias sem chuva", "dias_sem_chuva")
+        rule_prec = _numeric_filter_block("Precipitação (mm)", "precipitacao")
+        rule_risco = _numeric_filter_block("Risco de fogo (0–1)", "risco")
+        rule_frp = _numeric_filter_block("Intensidade (FRP)", "frp")
+
+        st.caption("Use “entre” para faixas. Deixe “(sem filtro)” para ignorar o campo.")
 
     buscar = st.sidebar.button("Analisar", type="primary")
 
@@ -78,7 +95,10 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
         "start": start_ts,
         "end": end_ts,
         "turno_preset": None if turno_preset == "(sem filtro)" else turno_preset,
-        "custom_time": (pd.to_datetime(str(t0)) if t0 else None, pd.to_datetime(str(t1)) if t1 else None) if custom_time else None,
+        "custom_time": (
+            pd.to_datetime(str(t0)) if t0 else None,
+            pd.to_datetime(str(t1)) if t1 else None
+        ) if custom_time else None,
         "numeric_rules": {
             "DiaSemChuva": rule_dias,
             "Precipitacao": rule_prec,
