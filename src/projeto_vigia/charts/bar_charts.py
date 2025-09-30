@@ -1,6 +1,6 @@
 import altair as alt
 import pandas as pd
-from projeto_vigia.config import PRIMARY_COLOR
+from ..core.settings import get_settings
 
 def bioma_chart(df_bioma: pd.DataFrame) -> alt.Chart:
     return (alt.Chart(df_bioma)
@@ -14,8 +14,9 @@ def bioma_chart(df_bioma: pd.DataFrame) -> alt.Chart:
             .properties(title="Focos de Queimada por Bioma"))
 
 # def municipio_chart(df_mun: pd.DataFrame) -> alt.Chart:
+#     S = get_settings()
 #     return (alt.Chart(df_mun)
-#             .mark_bar(color=PRIMARY_COLOR)
+#             .mark_bar(color=S.PRIMARY_COLOR)
 #             .encode(x=alt.X("Número de Focos:Q"),
 #                     y=alt.Y("Município:N", sort="-x"),
 #                     tooltip=["Município", "Número de Focos"])

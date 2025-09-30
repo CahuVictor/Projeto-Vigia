@@ -2,6 +2,8 @@ from __future__ import annotations
 import pandas as pd
 from typing import Iterable, Optional, Tuple
 
+from ..core.settings import get_settings
+
 # ---------------------------
 # Datas e turno
 # ---------------------------
@@ -21,13 +23,16 @@ def filter_by_turno(df: pd.DataFrame,
     dff["hora"] = dff["data_hora"].dt.hour + dff["data_hora"].dt.minute/60.0
 
     if preset:
-        ranges = {
-            "Madrugada": (0.0, 6.0),
-            "Manhã": (6.0, 12.0),
-            "Tarde": (12.0, 18.0),
-            "Noite": (18.0, 24.0),
+        S = get_settings()
+        
+        RANGES = {
+            "Madrugada": S.SHIFT_MADRUGADA,
+            "Manhã": S.SHIFT_MANHA,
+            "Tarde": S.SHIFT_TARDE,
+            "Noite": S.SHIFT_NOITE,
         }
-        h0, h1 = ranges[preset]
+        
+        h0, h1 = RANGES[preset]
         mask = (dff["hora"] >= h0) & (dff["hora"] < h1)
         return dff.loc[mask].drop(columns=["hora"])
     if custom_range:

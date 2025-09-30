@@ -7,10 +7,9 @@ from ..charts.bar_charts import bioma_chart as _bioma_chart, municipio_chart_by_
 from ..charts.maps import simple_map
 from .compat import kw_for
 from ..core.logging_config import get_logger
+from ..core.settings import get_settings
 
 log = get_logger(app="ProjetoVigia", module="stats")
-
-VIOLETA = "#8A2BE2"  # blueviolet
 
 def render_summary_tab(df: pd.DataFrame, estado: str, crit_df: pd.DataFrame | None = None):
     st.subheader(f"Resumo para {estado}")
@@ -77,6 +76,10 @@ def render_prevention_tab():
     """)
 
 def render_stats_tab(df: pd.DataFrame):
+    S = get_settings()
+    
+    VIOLETA = S.RISK_COLOR_FOR_STATS  # blueviolet
+    
     st.subheader("Análise Estatística")
     cols_num = ["DiaSemChuva","Precipitacao","RiscoFogo","FRP"]
     

@@ -1,6 +1,8 @@
 from __future__ import annotations
 import pandas as pd
 
+from ..core.settings import get_settings
+
 def by_day(df: pd.DataFrame) -> pd.DataFrame:
     dff = df.copy()
     dff["data"] = dff["data_hora"].dt.date
@@ -59,6 +61,9 @@ def compute_critical_regions(df: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
     - lat/lon médios (para referência)
     - score simples para rank
     """
+    S = get_settings()
+    
+    w_focos, w_risco, w_frp = S.CRITICAL_SCORE_WEIGHTS
     dff = df.copy()
     grp = (dff.groupby(["estado_nome", "municipio_nome", "Bioma"])
              .agg(
@@ -75,5 +80,5 @@ def compute_critical_regions(df: pd.DataFrame, top_n: int = 5) -> pd.DataFrame:
              .reset_index())
     # Score: quantidade + risco médio (se NA vira 0) + FRP médio
     grp["risco_medio"] = grp["risco_medio"].fillna(0).astype("float64")
-    grp["score"] = grp["focos"]*0.6 + grp["risco_medio"]*100*0.25 + grp["frp_medio"]*0.15
-    return grp.sort_values(["score","focos","frp_medio"], ascending=False).head(top_n)
+    grp["score"] = grp["focos"]*w_focos + grp["risco_medio"]*100*w_risco + grp["frp_medio"]*w_frp
+    return grp.sort_values(["score","focos","frp_medio"], ascending=False).head(top_n or S.CRITICAL_REGIONS_TOP_N)

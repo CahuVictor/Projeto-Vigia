@@ -4,6 +4,11 @@ import sys
 import logging
 import structlog
 
+from .settings import get_settings
+
+# S = get_settings()
+# usar S.LOG_LEVEL, S.LOG_FORMAT, S.LOG_FILE
+
 def configure_logging() -> None:
     # Nível/formato por env (padrões seguros)
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()

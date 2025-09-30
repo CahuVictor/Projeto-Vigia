@@ -1,8 +1,13 @@
 from __future__ import annotations
 import streamlit as st
 import pandas as pd
+
+# --- carregar .env antes de tudo ---
+from dotenv import load_dotenv
+load_dotenv()
+# -----------------------------------
+
 from projeto_vigia.theming import setup_page, inject_css
-from projeto_vigia.config import FILE_URL, LOGO_URL
 from projeto_vigia.services.data_io import read_csv_from_gdrive
 from projeto_vigia.domain.preprocessing import normalize_dataframe
 from projeto_vigia.analytics.filters import (
@@ -18,6 +23,14 @@ from projeto_vigia.ui.sections import (
 )
 from projeto_vigia.ui.compat import kw_for
 from projeto_vigia.core.logging_config import configure_logging, get_logger
+from projeto_vigia.core.settings import get_settings
+
+S = get_settings()
+
+@st.cache_data(ttl=S.CACHE_TTL_SECONDS, show_spinner="Baixando e processando dados CSV...")
+def load_dataset(url: str) -> pd.DataFrame:
+    # ...
+    return normalize_dataframe(df)
 
 # Logging
 configure_logging()
@@ -40,12 +53,12 @@ def load_dataset(url: str) -> pd.DataFrame:
     return df2
 
 try:
-    df_full = load_dataset(FILE_URL)
+    df_full = load_dataset(S.FILE_URL)
 except Exception as e:
     df_full = pd.DataFrame()
     st.error(f"Falha ao carregar dados: {e}")
 
-sidebar_state = render_sidebar(df_full, LOGO_URL)
+sidebar_state = render_sidebar(df_full, S.LOGO_URL)
 
 if df_full.empty:
     st.warning("Os dados não puderam ser carregados. Verifique o link/permissões.")

@@ -1,6 +1,9 @@
 import streamlit as st
 
+from projeto_vigia.core.settings import get_settings
+
 def setup_page():
+    S = get_settings()
     st.set_page_config(
         page_title="Análise de Queimadas no Brasil",
         page_icon="🔥",
@@ -9,6 +12,7 @@ def setup_page():
     )
 
 def inject_css():
+    S = get_settings()
     st.markdown("""
     <style>
       [data-testid="stAppViewContainer"] { background-color: #1a1a1a; }

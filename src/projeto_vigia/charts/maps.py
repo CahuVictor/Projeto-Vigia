@@ -2,6 +2,8 @@ import streamlit as st
 import pydeck as pdk
 import pandas as pd
 
+from ..core.settings import get_settings
+
 def _risk_to_rgb(r):
     """
     Mapeia RiscoFogo ∈ [0,1] para cor do amarelo ao vermelho:
@@ -9,14 +11,18 @@ def _risk_to_rgb(r):
     1 -> vermelho (220, 20, 60)
     Nulo -> cinza claro (fallback)
     """
+    S = get_settings()
+    
     if pd.isna(r):
         return [180,180,180]
     r = max(0.0, min(1.0, float(r)))
-    yellow = (255, 215, 0)
-    red = (220, 20, 60)
+    yellow = S.MAP_RISK_YELLOW
+    red = S.MAP_RISK_RED
     return [int(yellow[i] + (red[i]-yellow[i])*r) for i in range(3)]
 
 def simple_map(df: pd.DataFrame):
+    S = get_settings()
+    
     if df.empty:
         st.info("Sem dados para mapear.")
         return
@@ -26,7 +32,7 @@ def simple_map(df: pd.DataFrame):
 
     frp = dff["FRP"].clip(lower=0.0)
     frp_norm = (frp - frp.min()) / (frp.max() - frp.min() + 1e-9)
-    dff["radius"] = 300 + (frp_norm * 1700)
+    dff["radius"] = S.MAP_RADIUS_MIN_M + frp_norm * (S.MAP_RADIUS_MAX_M - S.MAP_RADIUS_MIN_M)
 
     layer = pdk.Layer(
         "ScatterplotLayer",
