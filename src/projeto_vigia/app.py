@@ -21,7 +21,7 @@ from projeto_vigia.analytics.aggregations import (
 from projeto_vigia.ui.sidebar import render_sidebar
 from projeto_vigia.ui.sections import (
     render_summary_tab, render_time_tab, render_biome_city_tab,
-    render_prevention_tab, render_stats_tab
+    render_prevention_tab, render_stats_tab, render_time_tab_filtered
 )
 from projeto_vigia.charts.maps import hex_map, screengrid_map, grid_map
 from projeto_vigia.ui.compat import kw_for
@@ -33,8 +33,14 @@ S = get_settings()
 
 def _normalize_filters(sidebar_state: dict) -> dict:
     """
-    Converte o estado dos filtros em tipos hasháveis/estáveis para comparação.
-    Assim sabemos se os filtros mudaram entre um rerun e outro.
+    Converte o estado bruto da sidebar em tipos hasháveis/estáveis para comparação.
+    Por quê?
+    - Para saber se os filtros mudaram entre reruns (e então decidir se reanalisamos).
+
+    Estratégia:
+    - listas -> tuplas
+    - datetimes -> str (ISO) ou HH:MM para horários
+    - dicts (regras numéricas) -> lista de pares ordenada e “imutável”
     """
     if not sidebar_state:
         return {}
@@ -44,7 +50,7 @@ def _normalize_filters(sidebar_state: dict) -> dict:
         "start": str(sidebar_state["start"]),
         "end": str(sidebar_state["end"]),
         "turno_preset": sidebar_state["turno_preset"],
-        # custom_time pode ser None ou (t0, t1); guardamos só HH:MM
+        # custom_time pode ser None ou (t0, t1); guarda só HH:MM
         "custom_time": None if not sidebar_state["custom_time"] else (
             sidebar_state["custom_time"][0].strftime("%H:%M"),
             sidebar_state["custom_time"][1].strftime("%H:%M"),
@@ -55,11 +61,6 @@ def _normalize_filters(sidebar_state: dict) -> dict:
             for k, v in (sidebar_state["numeric_rules"] or {}).items()
         ])),
     }
-
-@st.cache_data(ttl=S.CACHE_TTL_SECONDS, show_spinner="Baixando e processando dados CSV...")
-def load_dataset(url: str) -> pd.DataFrame:
-    # ...
-    return normalize_dataframe(df)
 
 # Logging
 configure_logging()
@@ -72,12 +73,23 @@ inject_css()
 st.title("🔥 Painel de Análise de Queimadas no Brasil")
 st.markdown("Este painel realiza uma análise interativa de focos de queimadas com base em um arquivo de dados da web.")
 
-@st.cache_data(ttl=86400, show_spinner="Baixando e processando dados CSV...")
+@st.cache_data(ttl=S.CACHE_TTL_SECONDS, show_spinner="Baixando e processando dados CSV...")
 def load_dataset(url: str) -> pd.DataFrame:
+    """
+    Baixa a base CSV, normaliza e devolve um DataFrame pronto para uso.
+
+    Por que cache?
+    - Evita baixar/processar em todo rerun; só reexecuta quando 'url' muda, o código muda
+      ou quando o TTL expira.
+
+    Logs:
+    - Emite logs informativos (start/ok/normalized) para ajudar a depurar tempo de I/O
+      e a checar se a normalização está coerente.
+    """
     log.info("dataset_download_start", url=url)
-    df = read_csv_from_gdrive(url)
+    df = read_csv_from_gdrive(url)                    # <- I/O (rede)
     log.info("dataset_download_ok", rows=len(df))
-    df2 = normalize_dataframe(df)
+    df2 = normalize_dataframe(df)                     # <- limpeza/tipagem/NA/etc.
     log.info("dataset_normalized", rows=len(df2), cols=list(df2.columns))
     return df2
 
@@ -88,35 +100,40 @@ except Exception as e:
     df_full = pd.DataFrame()
     st.error(f"Falha ao carregar dados: {e}")
 
+# Pega o dicionário de filtros atual e normaliza (para comparação)
 sidebar_state = render_sidebar(df_full, S.LOGO_URL)
+log.info("render_sidebar", rows=len(df_full), cols=list(df_full), logo_url=S.LOGO_URL)
 
 filters_now = _normalize_filters(sidebar_state) if sidebar_state else {}
+log.info("normalize_filters")
 
 # Isso mantém entre reruns
 ss = st.session_state
 
-# Condição para (re)analisar:
+# Decide se é hora de reprocessar (“Analisar” clicado, 1ª vez, ou filtros mudaram)
 should_analyze = (
     df_full is not None
     and not df_full.empty
     and sidebar_state is not None
     and (
         sidebar_state["buscar"]                     # clicou no botão "Analisar"
-        or ("last_filters" not in ss)               # primeira vez
-        or (filters_now != ss.get("last_filters"))  # filtros mudaram
+        or ("last_filters" not in ss)               # primeira interação
+        or (filters_now != ss.get("last_filters"))  # filtros alterados
     )
 )
 
 if should_analyze:
+    # 1) Extrai filtros
     # ======= RECOMPÕE O PIPELINE =======
-    estado = sidebar_state["estado"]
-    biomas = sidebar_state["biomas"]
-    start_dt = sidebar_state["start"]
-    end_dt = sidebar_state["end"]
-    turno_preset = sidebar_state["turno_preset"]
-    custom_time = sidebar_state["custom_time"]
+    estado        = sidebar_state["estado"]
+    biomas        = sidebar_state["biomas"]
+    start_dt      = sidebar_state["start"]
+    end_dt        = sidebar_state["end"]
+    turno_preset  = sidebar_state["turno_preset"]
+    custom_time   = sidebar_state["custom_time"]
     numeric_rules = sidebar_state["numeric_rules"]
 
+    # 2) Pipeline (ordem importa)
     # Estado
     dff = df_full if estado == "Todos" else df_full[df_full["estado_nome"] == estado].copy()
     # Período
@@ -128,9 +145,11 @@ if should_analyze:
     # Numéricos
     dff = filter_numeric_columns(dff, numeric_rules)
 
+    # 3) Cálculos “caros” uma única vez
     # Regiões críticas calculadas uma vez
     crit = compute_critical_regions(dff, top_n=5)
 
+    # 4) Persiste resultados p/ sobreviver a reruns e trocar de modo de mapa sem recomputar
     # ======= PERSISTE NO SESSION_STATE =======
     ss["analysis_ready"] = True
     ss["last_filters"] = filters_now
@@ -139,6 +158,7 @@ if should_analyze:
     ss["estado"] = estado
     ss["periodo"] = (start_dt, end_dt)
 
+    # 5) Log útil para auditoria/monitoramento
     log.info("filters_applied",
         estado=estado,
         biomas=len(biomas) if biomas else 0,
@@ -179,19 +199,24 @@ elif ss.get("analysis_ready") and "dff" in ss:
         
         log_memory("after_summary_tab")
     with tab2:
-        render_time_tab(
-            by_day(dff),
-            series_by_dimension(dff, "estado_nome"),
-            series_by_dimension(dff, "Bioma"),
-        )
+        # render_time_tab(
+        #     by_day(dff),
+        #     series_by_dimension(dff, "estado_nome"),
+        #     series_by_dimension(dff, "Bioma"),
+        # )
+        render_time_tab_filtered(dff, start_dt, end_dt)
+        log.info("render_time_tab", rows=len(dff), cols=list(dff))
     with tab3:
         df_bioma = by_biome(dff)
         df_mun_bioma = top_municipios_with_bioma(dff)
         render_biome_city_tab(df_bioma, df_mun_bioma) # old render_biome_city_tab(by_biome(dff), top_municipios(dff))
+        log.info("render_biome_city_tab", rows_bioma=len(df_bioma), cols_bioma=list(df_bioma), rows_mun_bioma=len(df_mun_bioma), cols_mun_bioma=list(df_mun_bioma))
     with tab4:
         render_stats_tab(dff)
+        log.info("render_stats_tab", rows=len(dff), cols=list(dff))
     with tab5:
         render_prevention_tab()
+        log.info("render_prevention_tab")
 
     with st.expander("Ver dados brutos (todas as colunas)"):
         df_disp = dff.rename(columns={"lat":"Latitude","lon":"Longitude","data_hora":"Data/Hora",

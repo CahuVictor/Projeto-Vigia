@@ -6,6 +6,8 @@ import requests
 import io
 from typing import Dict, Any
 
+from ..services.assets import get_logo_image
+
 def load_logo(url: str) -> Image.Image | None:
     try:
         r = requests.get(url, stream=True, timeout=20)
@@ -31,14 +33,26 @@ def _numeric_filter_block(label: str, key_prefix: str) -> Dict[str, Any]:
 
     return {"op": op, "a": (None if op == "(sem filtro)" else a), "b": (None if disabled_b else b)}
 
-def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
-    if (logo := load_logo(logo_url)):
+def render_sidebar(df_full: pd.DataFrame | None, logo_url: str) -> dict | None:
+    """
+    Renderiza a Sidebar e devolve um dicionário padronizado com os valores dos filtros.
+    logotipo é cacheado via st.cache_resource (baixa apenas uma vez).
+
+    Por que devolver um dict?
+    - Facilita comparar se os filtros mudaram (com _normalize_filters)
+    - Facilita persistir todo o estado no st.session_state quando analisado
+
+    Caso não haja df, desabilita os controles e retorna None.
+    """
+    try:
+        logo = get_logo_image(logo_url) # logo := load_logo(logo_url)
         st.sidebar.image(logo)
-    else:
+    except Exception:
         st.sidebar.warning("Não foi possível carregar o logotipo.")
 
     st.sidebar.header("Filtros de Análise")
 
+    # Sem dados, sem filtros
     if df_full is None or df_full.empty:
         st.sidebar.selectbox("Estado", ["Dados não carregados"], disabled=True)
         st.sidebar.date_input("Período", disabled=True)
@@ -52,7 +66,7 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
     biomas_unique = sorted(df_full["Bioma"].dropna().unique().tolist())
     biomas = st.sidebar.multiselect("Biomas", options=biomas_unique, default=[])
 
-    # Date range em 1 campo
+    # --- Período (um único controle de range de datas) ---
     min_date = df_full["data_hora"].min().date()
     max_date = df_full["data_hora"].max().date()
     start_end = st.sidebar.date_input(
@@ -61,6 +75,8 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
         min_value=min_date,
         max_value=max_date
     )
+    
+    # Streamlit retorna date único ou tupla; garantimos tupla:
     if isinstance(start_end, tuple):
         d0, d1 = start_end
     else:
@@ -78,7 +94,7 @@ def render_sidebar(df_full: pd.DataFrame | None, logo_url: str):
         t0 = c1.time_input("Início", value=pd.Timestamp("2000-01-01 08:00").time())
         t1 = c2.time_input("Fim", value=pd.Timestamp("2000-01-01 18:00").time())
 
-    # Filtros numéricos (AGORA 100% NA SIDEBAR)
+    # --- Filtros numéricos (todos na sidebar) ---
     with st.sidebar.expander("Filtros Numéricos", expanded=True):
         rule_dias = _numeric_filter_block("Dias sem chuva", "dias_sem_chuva")
         rule_prec = _numeric_filter_block("Precipitação (mm)", "precipitacao")

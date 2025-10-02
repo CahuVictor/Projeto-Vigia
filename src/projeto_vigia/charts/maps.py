@@ -57,14 +57,14 @@ def simple_map(df: pd.DataFrame):
     st.pydeck_chart(r)
 
     # Legenda simples (amarelo -> vermelho)
-    st.markdown("""
-    <div style="padding:6px; border:1px solid #444; display:inline-block; border-radius:6px; background:#222; color:#ddd;">
-      <b>Legenda (Risco de Fogo)</b>&nbsp;&nbsp;
-      <span style="display:inline-block; width:14px; height:14px; background:rgb(255,215,0);"></span> 0 &nbsp;→&nbsp;
-      <span style="display:inline-block; width:14px; height:14px; background:rgb(220,20,60);"></span> 1
-      &nbsp;&nbsp;<small>(cor do marcador)</small>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div style="padding:6px; border:1px solid #444; display:inline-block; border-radius:6px; background:#222; color:#ddd;">
+    #   <b>Legenda (Risco de Fogo)</b>&nbsp;&nbsp;
+    #   <span style="display:inline-block; width:14px; height:14px; background:rgb(255,215,0);"></span> 0 &nbsp;→&nbsp;
+    #   <span style="display:inline-block; width:14px; height:14px; background:rgb(220,20,60);"></span> 1
+    #   &nbsp;&nbsp;<small>(cor do marcador)</small>
+    # </div>
+    # """, unsafe_allow_html=True)
 
 def hex_map(df: pd.DataFrame):
     """Agrega no cliente em hexágonos 3D (elevação ~ contagem/peso)."""    
@@ -156,11 +156,11 @@ def grid_map(df_grid: pd.DataFrame):
     st.pydeck_chart(deck, **kw_for(st.pydeck_chart))
 
     # legenda
-    st.markdown("""
-    <div style="padding:6px; border:1px solid #444; display:inline-block; border-radius:6px; background:#222; color:#ddd;">
-      <b>Legenda (Risco de Fogo)</b>&nbsp;&nbsp;
-      <span style="display:inline-block; width:14px; height:14px; background:rgb(255,215,0);"></span> 0 &nbsp;→&nbsp;
-      <span style="display:inline-block; width:14px; height:14px; background:rgb(220,20,60);"></span> 1
-      &nbsp;&nbsp;<small>(cor do marcador)</small>
-    </div>
-    """, unsafe_allow_html=True)
+    # st.markdown("""
+    # <div style="padding:6px; border:1px solid #444; display:inline-block; border-radius:6px; background:#222; color:#ddd;">
+    #   <b>Legenda (Risco de Fogo)</b>&nbsp;&nbsp;
+    #   <span style="display:inline-block; width:14px; height:14px; background:rgb(255,215,0);"></span> 0 &nbsp;→&nbsp;
+    #   <span style="display:inline-block; width:14px; height:14px; background:rgb(220,20,60);"></span> 1
+    #   &nbsp;&nbsp;<small>(cor do marcador)</small>
+    # </div>
+    # """, unsafe_allow_html=True)
